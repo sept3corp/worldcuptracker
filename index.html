@@ -350,15 +350,6 @@ function renderBalances(gross) {
 }
 
 function renderSettle(pairNet,gross,champion,bootLeader) {
-  const pairs=[];
-  for(let i=0;i<OWNERS.length;i++) for(let j=i+1;j<OWNERS.length;j++){
-    const a=OWNERS[i],c=OWNERS[j];
-    const n=pairNet[a][c];
-    pairs.push(n>0?`${b(a)} → ${b(c)} <strong>${baht(n)}</strong>`:
-               n<0?`${b(c)} → ${b(a)} <strong>${baht(-n)}</strong>`:
-               `<span class="muted">${a} ↔ ${c}: even</span>`);
-  }
-
   const champBox = champion
     ? `<div class="info-box">🏆 <strong>${champion.team}</strong> won — ${b(champion.owner)} receives Champion Bonus ฿${CHAMP_BONUS}×3 = ฿${CHAMP_BONUS*3} on top of Final match payout.</div>`
     : `<div class="info-box pending">🏆 Champion Bonus ฿${CHAMP_BONUS*3} — pending (tournament in progress)</div>`;
@@ -367,8 +358,6 @@ function renderSettle(pairNet,gross,champion,bootLeader) {
   const bootBox = topGoal
     ? `<div class="info-box">👟 Golden Boot leader: <strong>${topGoal[0]}</strong> ${b(PLAYER_OWNER[topGoal[0]])} — ${topGoal[1]} goal${topGoal[1]>1?'s':''} &nbsp;<span class="pending">(bonus ฿${BOOT_BONUS*3} pending)</span></div>`
     : `<div class="info-box pending">👟 Golden Boot ฿${BOOT_BONUS*3} — pending (no drafted goals yet)</div>`;
-
-  const pairGrid = `<div class="pair-grid">${pairs.map(p=>`<div class="pair-card">${p}</div>`).join('')}</div>`;
 
   const balTable = `<table>
     <thead><tr><th>Owner</th><th>Net</th><th>Received</th><th>Owed</th></tr></thead>
@@ -380,7 +369,6 @@ function renderSettle(pairNet,gross,champion,bootLeader) {
   </table>`;
 
   return `${champBox}${bootBox}
-    <section><h2>Who owes whom (net)</h2>${pairGrid}</section>
     <section><h2>Gross balances</h2>${balTable}</section>`;
 }
 
