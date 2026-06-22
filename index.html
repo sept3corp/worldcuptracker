@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WC26 Bet Tracker</title>
+<style>
+:root {
+  --bg:#0d1117; --card:#161b22; --border:#30363d;
+  --text:#e6edf3; --muted:#8b949e;
+  --green:#3fb950; --red:#f85149; --yellow:#e3b341; --blue:#58a6ff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--blue);text-decoration:none}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+header h1{font-size:1.1rem;font-weight:700;flex:1}
+.meta{color:var(--muted);font-size:.8rem}
+button{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.35rem .85rem;cursor:pointer;font-size:.85rem}
+button:hover{border-color:var(--blue)}
+button:disabled{opacity:.4;cursor:not-allowed}
+main{padding:1.25rem 1.5rem;max-width:1200px;margin:0 auto}
+.balances{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem}
+@media(max-width:640px){.balances{grid-template-columns:repeat(2,1fr)}}
+.bcard{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem}
+.bcard .name{font-weight:700;margin-bottom:.2rem}
+.bcard .amt{font-size:1.5rem;font-weight:700}
+.bcard .lbl{font-size:.75rem;color:var(--muted);margin-top:.15rem}
+.pos{color:var(--green)} .neg{color:var(--red)} .zero{color:var(--muted)}
+.tabs{display:flex;gap:.15rem;border-bottom:1px solid var(--border);margin-bottom:1.25rem;overflow-x:auto}
+.tab{padding:.45rem .9rem;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-size:.85rem;white-space:nowrap}
+.tab.active{color:var(--text);border-bottom-color:var(--blue)}
+.tab:hover:not(.active){color:var(--text)}
+.pane{display:none} .pane.active{display:block}
+section{margin-bottom:1.75rem}
+section h2{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:.4rem .65rem;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:.8rem;white-space:nowrap}
+td{padding:.4rem .65rem;border-bottom:1px solid rgba(48,54,61,.4);font-size:.85rem}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.badge{display:inline-block;padding:.1rem .45rem;border-radius:4px;font-size:.75rem;font-weight:600}
+.b-Den{background:rgba(88,166,255,.15);color:#58a6ff}
+.b-Jong{background:rgba(63,185,80,.15);color:#3fb950}
+.b-Kao{background:rgba(210,153,34,.15);color:#d29922}
+.b-Pi{background:rgba(188,140,255,.15);color:#bc8cff}
+.error{background:rgba(248,81,73,.08);border:1px solid var(--red);border-radius:6px;padding:.75rem 1rem;color:var(--red);margin-bottom:1rem;font-size:.85rem}
+.warn{background:rgba(227,179,65,.08);border:1px solid var(--yellow);border-radius:6px;padding:.75rem 1rem;color:var(--yellow);margin-bottom:1rem;font-size:.85rem}
+.info-box{background:rgba(48,54,61,.4);border:1px solid var(--border);border-radius:6px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:.85rem}
+.pending{color:var(--muted);font-style:italic}
+.pair-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.6rem;margin-bottom:1rem}
+.pair-card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.65rem .9rem;font-size:.85rem}
+.loading{text-align:center;padding:3rem;color:var(--muted)}
+.flag{color:var(--yellow)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ WC26 Bet Tracker</h1>
+  <span class="meta" id="upd">—</span>
+  <button id="rbtn" onclick="load()">↻ Refresh</button>
+</header>
+<main>
+  <div id="err" style="display:none" class="error"></div>
+  <div class="balances" id="balances">
+    <div class="bcard"><div class="name">Den</div><div class="amt zero">฿0</div></div>
+    <div class="bcard"><div class="name">Jong</div><div class="amt zero">฿0</div></div>
+    <div class="bcard"><div class="name">Kao</div><div class="amt zero">฿0</div></div>
+    <div class="bcard"><div class="name">Pi</div><div class="amt zero">฿0</div></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="tab(this,'settle')">Settlement</button>
+    <button class="tab" onclick="tab(this,'matches')">Matches</button>
+    <button class="tab" onclick="tab(this,'goals')">Goals</button>
+    <button class="tab" onclick="tab(this,'teams')">Teams</button>
+    <button class="tab" onclick="tab(this,'scorers')">Scorers</button>
+  </div>
+  <div id="pane-settle" class="pane active"><div class="loading">Loading…</div></div>
+  <div id="pane-matches" class="pane"><div class="loading">Loading…</div></div>
+  <div id="pane-goals" class="pane"><div class="loading">Loading…</div></div>
+  <div id="pane-teams" class="pane"><div class="loading">Loading…</div></div>
+  <div id="pane-scorers" class="pane"><div class="loading">Loading…</div></div>
+</main>
+<script>
+// ── MANUAL GOAL CORRECTIONS ─────────────────────────────────────────────────
+// Add entries here when the API is missing a scorer or has wrong data.
+// player must exactly match a name in SCORERS above.
+// type: 'group' | 'r32' | 'r16' | 'qf' | 'sf' | 'third' | 'final'
+const GOAL_CORRECTIONS = [
+  // { date:'06/20/2026', type:'group', match:'England vs Panama', player:'Kane', note:'2nd goal missing from API' },
+];
+
+// ── DRAFT DATA ──────────────────────────────────────────────────────────────
+const OWNERS = ['Den','Jong','Kao','Pi'];
+
+const TEAMS = {
+  Den:  ['Czechia','Qatar','Morocco','United States','Ivory Coast','Tunisia','Belgium','Spain','Senegal','Argentina','Uzbekistan','Panama'],
+  Jong: ['South Africa','Switzerland','Scotland','Australia','Curaçao','Netherlands','New Zealand','Uruguay','Norway','Austria','Colombia','England'],
+  Kao:  ['South Korea','Bosnia and Herzegovina','Brazil','Türkiye','Germany','Japan','Egypt','Saudi Arabia','Iraq','Jordan','DR Congo','Croatia'],
+  Pi:   ['Mexico','Canada','Haiti','Paraguay','Ecuador','Sweden','Iran','Cape Verde','France','Algeria','Portugal','Ghana'],
+};
+
+const SCORERS = {
+  Den:  ['Messi','Alvarez','Rapinha','Olise','Saka','Cherki','Doku','Martinelli'],
+  Jong: ['Mbappe','Yamal','Haaland','K. Havertz','L. Martinez','Cunha','Gyokeres','B. Fermin'],
+  Kao:  ['Kane','Oyarzabal','Wirtz','Rafael Leao','Diaz','Nunez','Salah','Ousmane Dembele'],
+  Pi:   ['V. Junior','F. Torres','Ronaldo','Musiala','Gakpo','Rashford','Ueda'],
+};
+
+// reverse lookups
+const TEAM_OWNER = {}, PLAYER_OWNER = {};
+for (const [o,ts] of Object.entries(TEAMS)) for (const t of ts) TEAM_OWNER[t]=o;
+for (const [o,ps] of Object.entries(SCORERS)) for (const p of ps) PLAYER_OWNER[p]=o;
+
+// ── ALIASES ─────────────────────────────────────────────────────────────────
+const TEAM_ALIAS = {
+  'Turkey':'Türkiye','Turkiye':'Türkiye',
+  'Bosnia':'Bosnia and Herzegovina','Bosnia & Herzegovina':'Bosnia and Herzegovina',
+  "Côte d'Ivoire":'Ivory Coast',"Cote d'Ivoire":'Ivory Coast','Cote D\'Ivoire':'Ivory Coast',
+  'Curacao':'Curaçao','Curazao':'Curaçao',
+  'USA':'United States','US':'United States','United States of America':'United States',
+  'Czech Republic':'Czechia','Czechia':'Czechia',
+  'Korea Republic':'South Korea','Republic of Korea':'South Korea','South Korea Republic':'South Korea',
+  'Congo DR':'DR Congo','Congo, DR':'DR Congo','Democratic Republic of Congo':'DR Congo',
+  'Cabo Verde':'Cape Verde',
+};
+
+// key: lowercased API scorer name (without minute) → canonical draft name
+const PLAYER_ALIAS = {
+  // Den
+  'l. messi':'Messi','messi':'Messi',
+  'j. álvarez':'Alvarez','j. alvarez':'Alvarez','álvarez':'Alvarez','alvarez':'Alvarez',
+  'raphinha':'Rapinha','rapinha':'Rapinha','r. raphinha':'Rapinha',
+  'm. olise':'Olise','olise':'Olise',
+  'b. saka':'Saka','saka':'Saka',
+  'r. cherki':'Cherki','cherki':'Cherki',
+  'j. doku':'Doku','doku':'Doku',
+  'g. martinelli':'Martinelli','martinelli':'Martinelli',
+  // Jong
+  'k. mbappé':'Mbappe','k. mbappe':'Mbappe','mbappé':'Mbappe','mbappe':'Mbappe',
+  'l. yamal':'Yamal','yamal':'Yamal','lamine yamal':'Yamal',
+  'e. haaland':'Haaland','haaland':'Haaland',
+  'k. havertz':'K. Havertz','havertz':'K. Havertz',
+  'l. martínez':'L. Martinez','l. martinez':'L. Martinez',
+  'm. cunha':'Cunha','cunha':'Cunha','matheus cunha':'Cunha',
+  'v. gyökeres':'Gyokeres','v. gyokeres':'Gyokeres','gyökeres':'Gyokeres','gyokeres':'Gyokeres','viktor gyökeres':'Gyokeres',
+  'f. beltrán':'B. Fermin','b. fermín':'B. Fermin','b. fermin':'B. Fermin','fermín':'B. Fermin','fermin':'B. Fermin','fermín lópez':'B. Fermin',
+  // Kao
+  'h. kane':'Kane','kane':'Kane','harry kane':'Kane',
+  'm. oyarzábal':'Oyarzabal','m. oyarzabal':'Oyarzabal','oyarzábal':'Oyarzabal','oyarzabal':'Oyarzabal',
+  'f. wirtz':'Wirtz','wirtz':'Wirtz','florian wirtz':'Wirtz',
+  'r. leão':'Rafael Leao','r. leao':'Rafael Leao','rafael leão':'Rafael Leao','rafael leao':'Rafael Leao','leão':'Rafael Leao','leao':'Rafael Leao',
+  'l. díaz':'Diaz','l. diaz':'Diaz','díaz':'Diaz','diaz':'Diaz','luis díaz':'Diaz',
+  'd. núñez':'Nunez','d. nunez':'Nunez','núñez':'Nunez','nunez':'Nunez','darwin núñez':'Nunez',
+  'm. salah':'Salah','salah':'Salah','mohamed salah':'Salah',
+  'o. dembélé':'Ousmane Dembele','o. dembele':'Ousmane Dembele','dembélé':'Ousmane Dembele','dembele':'Ousmane Dembele','ousmane dembélé':'Ousmane Dembele',
+  // Pi
+  'vinícius júnior':'V. Junior','vinicius junior':'V. Junior','v. júnior':'V. Junior','v. junior':'V. Junior',
+  'vinícius':'V. Junior','vinicius':'V. Junior','viní':'V. Junior',
+  'f. torres':'F. Torres','ferran torres':'F. Torres','torres':'F. Torres',
+  'c. ronaldo':'Ronaldo','ronaldo':'Ronaldo','cristiano ronaldo':'Ronaldo',
+  'j. musiala':'Musiala','musiala':'Musiala','jamal musiala':'Musiala',
+  'c. gakpo':'Gakpo','gakpo':'Gakpo','cody gakpo':'Gakpo',
+  'm. rashford':'Rashford','rashford':'Rashford','marcus rashford':'Rashford',
+  'a. ueda':'Ueda','ueda':'Ueda','ayase ueda':'Ueda',
+  // additional full names (openfootball uses full names)
+  'lionel messi':'Messi','erling haaland':'Haaland',
+  'kai havertz':'K. Havertz','lautaro martínez':'L. Martinez','lautaro martinez':'L. Martinez',
+  'kylian mbappé':'Mbappe','kylian mbappe':'Mbappe',
+  'michael olise':'Olise','bukayo saka':'Saka',
+  'rayan cherki':'Cherki','jérémy doku':'Doku','jeremy doku':'Doku',
+  'gabriel martinelli':'Martinelli','julián álvarez':'Alvarez','julian alvarez':'Alvarez',
+  'mikel oyarzabal':'Oyarzabal','mikel oyarzábal':'Oyarzabal',
+  'viktor gyökeres':'Gyokeres','fermín lópez':'B. Fermin','fermin lopez':'B. Fermin',
+};
+
+// ── PAYOUT RULES ────────────────────────────────────────────────────────────
+const MATCH_PAY = {
+  group:150,
+  r32:150,round_of_32:150,
+  r16:200,round_of_16:200,
+  qf:400,quarterfinal:400,quarter_final:400,
+  sf:600,semifinal:600,semi_final:600,
+  third:600,third_place:600,third_place_playoff:600,
+  final:800,
+};
+const CHAMP_BONUS = 1200; // per non-champion owner
+const BOOT_BONUS  = 800;  // per non-winner owner
+
+function roundKey(type) {
+  return (type||'').toLowerCase().replace(/[\s-]/g,'_');
+}
+function matchPay(type) { return MATCH_PAY[roundKey(type)] ?? null; }
+function goalPay(type)  { return roundKey(type)==='group' ? 80 : 100; }
+function isKO(type)     { return roundKey(type) !== 'group'; }
+
+function roundLabel(type) {
+  const k = roundKey(type);
+  return ({group:'Group',r32:'R32',round_of_32:'R32',r16:'R16',round_of_16:'R16',
+    qf:'QF',quarterfinal:'QF',quarter_final:'QF',
+    sf:'SF',semifinal:'SF',semi_final:'SF',
+    third:'3rd',third_place:'3rd',third_place_playoff:'3rd',final:'Final'})[k] || type||'?';
+}
+
+// convert openfootball round string to our internal type key
+function roundKeyFromLabel(round) {
+  const r=(round||'').toLowerCase();
+  if (r.includes('32'))                          return 'r32';
+  if (r.includes('16'))                          return 'r16';
+  if (r.includes('quarter'))                     return 'qf';
+  if (r.includes('semi'))                        return 'sf';
+  if (r.includes('third')||r.includes('play-off')||r.includes('bronze')) return 'third';
+  if (r==='final')                               return 'final';
+  return 'group'; // matchday 1/2/3 etc. fallback
+}
+
+// ── NAME RESOLUTION ──────────────────────────────────────────────────────────
+function resolveTeam(apiName) {
+  if (!apiName) return null;
+  if (TEAM_OWNER[apiName]) return apiName;
+  const a = TEAM_ALIAS[apiName];
+  if (a) return a;
+  const low = apiName.toLowerCase();
+  for (const n of Object.keys(TEAM_OWNER)) if (n.toLowerCase()===low) return n;
+  return null;
+}
+
+// openfootball gives us a clean name string — no minute stripping needed
+function resolveScorerEntry(name) {
+  const low = name.toLowerCase();
+  if (PLAYER_ALIAS[low]) return PLAYER_ALIAS[low];
+  const norm = low.normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if (PLAYER_ALIAS[norm]) return PLAYER_ALIAS[norm];
+  // try last token only (last name fallback)
+  const last = low.split(/\s+/).pop();
+  if (PLAYER_ALIAS[last]) return PLAYER_ALIAS[last];
+  const lastNorm = last.normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if (PLAYER_ALIAS[lastNorm]) return PLAYER_ALIAS[lastNorm];
+  return null;
+}
+
+// ── PROCESS MATCHES (openfootball format) ────────────────────────────────────
+function process(matches) {
+  const matchLedger=[], goalLedger=[], unmatched=[], unmatchedTeams=new Set();
+
+  for (const m of matches) {
+    if (!m.score || !m.score.ft) continue; // not yet played
+    const home = resolveTeam(m.team1);
+    const away = resolveTeam(m.team2);
+    if (!home) unmatchedTeams.add(m.team1);
+    if (!away) unmatchedTeams.add(m.team2);
+    const hOwner = home ? TEAM_OWNER[home] : null;
+    const aOwner = away ? TEAM_OWNER[away] : null;
+    const hs = m.score.ft[0];
+    const as_ = m.score.ft[1];
+    const isGroup = !!m.group;
+    const type = isGroup ? 'group' : roundKeyFromLabel(m.round);
+    const date = m.date || '';
+
+    // match-win payout
+    const pay = matchPay(type);
+    if (pay!==null && hOwner && aOwner && hOwner!==aOwner) {
+      const draw = hs===as_ && isGroup;
+      let winner=null, loser=null;
+      if (!draw) {
+        if (hs>as_)      { winner=hOwner; loser=aOwner; }
+        else if (as_>hs) { winner=aOwner; loser=hOwner; }
+      }
+      matchLedger.push({date,type,home,away,hOwner,aOwner,score:`${hs}–${as_}`,winner,loser,amount:draw?0:pay,draw,penUnknown:!draw&&!winner&&!isGroup});
+    }
+
+    // goal payouts — each goal is a separate object; own goals already flagged
+    const gPay = goalPay(type);
+    const matchLabel = `${home??m.team1} vs ${away??m.team2}`;
+    for (const goal of [...(m.goals1||[]),...(m.goals2||[])]) {
+      if (goal.owngoal) continue; // spec: own goals never count
+      const canonical = resolveScorerEntry(goal.name);
+      if (canonical) {
+        goalLedger.push({date,type,match:matchLabel,raw:goal.name,player:canonical,scorerOwner:PLAYER_OWNER[canonical],amount:gPay});
+      } else {
+        unmatched.push({raw:goal.name,match:matchLabel,date,type});
+      }
+    }
+  }
+
+  // merge manual corrections
+  for (const c of GOAL_CORRECTIONS) {
+    if (!c.player || !PLAYER_OWNER[c.player]) { unmatched.push({raw:`[CORRECTION] ${c.player}`,match:c.match||'?',date:c.date||'?',type:c.type||'group'}); continue; }
+    goalLedger.push({date:c.date||'?',type:c.type||'group',match:c.match||'manual correction',raw:`[manual] ${c.note||c.player}`,player:c.player,scorerOwner:PLAYER_OWNER[c.player],amount:goalPay(c.type||'group')});
+  }
+
+  return {matchLedger,goalLedger,unmatched,unmatchedTeams:[...unmatchedTeams]};
+}
+
+// ── COMPUTE BALANCES ─────────────────────────────────────────────────────────
+function compute(matchLedger, goalLedger, games) {
+  // pairFlow[A][B] = gross A owes/paid B
+  const pf={};
+  for (const a of OWNERS){pf[a]={};for(const b of OWNERS)pf[a][b]=0;}
+  const flow=(a,b,n)=>{if(a&&b&&a!==b&&n>0)pf[a][b]+=n;};
+
+  for (const m of matchLedger) if(m.winner&&m.amount>0) flow(m.loser,m.winner,m.amount);
+  for (const g of goalLedger) for(const p of OWNERS) if(p!==g.scorerOwner) flow(p,g.scorerOwner,g.amount);
+
+  // champion bonus
+  let champion=null;
+  const fin = games.find(m=>roundKeyFromLabel(m.round)==='final' && m.score && m.score.ft);
+  if (fin) {
+    const hs=fin.score.ft[0], as_=fin.score.ft[1];
+    const cTeam = hs>as_ ? resolveTeam(fin.team1) : as_>hs ? resolveTeam(fin.team2) : null;
+    if (cTeam) { champion={team:cTeam,owner:TEAM_OWNER[cTeam]}; for(const o of OWNERS) if(o!==champion.owner) flow(o,champion.owner,CHAMP_BONUS); }
+  }
+
+  // golden boot (pending until tournament ends)
+  const scoreTally={};
+  for(const g of goalLedger){scoreTally[g.player]=(scoreTally[g.player]||0)+1;}
+  const bootLeader = Object.entries(scoreTally).sort((a,b)=>b[1]-a[1]);
+
+  // gross totals
+  const gross={};
+  for(const o of OWNERS){
+    let recv=0,owed=0;
+    for(const x of OWNERS){recv+=pf[x][o];owed+=pf[o][x];}
+    gross[o]={recv,owed,net:recv-owed};
+  }
+
+  // net per pair: pairNet[A][B]>0 means A owes B that net amount
+  const pairNet={};
+  for(const a of OWNERS){pairNet[a]={};for(const b of OWNERS)pairNet[a][b]=pf[a][b]-pf[b][a];}
+
+  return {gross,pairNet,champion,bootLeader};
+}
+
+// ── RENDERING ────────────────────────────────────────────────────────────────
+const b=(o)=>`<span class="badge b-${o}">${o}</span>`;
+const baht=(n)=>`฿${Math.abs(n).toLocaleString()}`;
+
+function renderBalances(gross) {
+  document.getElementById('balances').innerHTML = OWNERS.map(o=>{
+    const n=gross[o].net;
+    const cls=n>0?'pos':n<0?'neg':'zero';
+    const sign=n>0?'+':'';
+    return `<div class="bcard">
+      <div class="name">${b(o)}</div>
+      <div class="amt ${cls}">${sign}${baht(n)}</div>
+      <div class="lbl">${n>0?'net receiver':n<0?'net owes':'even'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSettle(pairNet,gross,champion,bootLeader) {
+  const pairs=[];
+  for(let i=0;i<OWNERS.length;i++) for(let j=i+1;j<OWNERS.length;j++){
+    const a=OWNERS[i],c=OWNERS[j];
+    const n=pairNet[a][c];
+    pairs.push(n>0?`${b(a)} → ${b(c)} <strong>${baht(n)}</strong>`:
+               n<0?`${b(c)} → ${b(a)} <strong>${baht(-n)}</strong>`:
+               `<span class="muted">${a} ↔ ${c}: even</span>`);
+  }
+
+  const champBox = champion
+    ? `<div class="info-box">🏆 <strong>${champion.team}</strong> won — ${b(champion.owner)} receives Champion Bonus ฿${CHAMP_BONUS}×3 = ฿${CHAMP_BONUS*3} on top of Final match payout.</div>`
+    : `<div class="info-box pending">🏆 Champion Bonus ฿${CHAMP_BONUS*3} — pending (tournament in progress)</div>`;
+
+  const topGoal = bootLeader[0];
+  const bootBox = topGoal
+    ? `<div class="info-box">👟 Golden Boot leader: <strong>${topGoal[0]}</strong> ${b(PLAYER_OWNER[topGoal[0]])} — ${topGoal[1]} goal${topGoal[1]>1?'s':''} &nbsp;<span class="pending">(bonus ฿${BOOT_BONUS*3} pending)</span></div>`
+    : `<div class="info-box pending">👟 Golden Boot ฿${BOOT_BONUS*3} — pending (no drafted goals yet)</div>`;
+
+  const pairGrid = `<div class="pair-grid">${pairs.map(p=>`<div class="pair-card">${p}</div>`).join('')}</div>`;
+
+  const balTable = `<table>
+    <thead><tr><th>Owner</th><th>Net</th><th>Received</th><th>Owed</th></tr></thead>
+    <tbody>${OWNERS.map(o=>{
+      const {recv,owed,net:n}=gross[o];
+      const cls=n>0?'pos':n<0?'neg':'';
+      return `<tr><td>${b(o)}</td><td class="${cls}"><strong>${n>=0?'+':''}${baht(n)}</strong></td><td class="pos">${baht(recv)}</td><td class="neg">${baht(owed)}</td></tr>`;
+    }).join('')}</tbody>
+  </table>`;
+
+  return `${champBox}${bootBox}
+    <section><h2>Who owes whom (net)</h2>${pairGrid}</section>
+    <section><h2>Gross balances</h2>${balTable}</section>`;
+}
+
+function renderMatches(matchLedger) {
+  if(!matchLedger.length) return '<p class="muted" style="padding:1rem">No completed matched matches yet.</p>';
+  const rows=[...matchLedger].reverse().map(m=>{
+    let payCell;
+    if(m.draw) payCell=`<span class="muted">Draw — ฿0</span>`;
+    else if(m.penUnknown) payCell=`<span class="flag">⚠ Penalties — result needed</span>`;
+    else if(m.winner) payCell=`${b(m.loser)} → ${b(m.winner)} ${baht(m.amount)}`;
+    else payCell='—';
+    return `<tr>
+      <td class="muted">${m.date}</td>
+      <td>${m.home} <span class="muted">vs</span> ${m.away}</td>
+      <td>${b(m.hOwner)} <span class="muted">vs</span> ${b(m.aOwner)}</td>
+      <td><strong>${m.score}</strong></td>
+      <td><span class="muted">${roundLabel(m.type)}</span></td>
+      <td>${payCell}</td>
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr><th>Date</th><th>Match</th><th>Owners</th><th>Score</th><th>Round</th><th>Payout</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderGoals(goalLedger,unmatched) {
+  let html='';
+  if(goalLedger.length) {
+    const rows=[...goalLedger].reverse().map(g=>{
+      const payers=OWNERS.filter(o=>o!==g.scorerOwner).map(b).join(' ');
+      const rawDiffers = g.raw.toLowerCase().replace(/\s+\d+['′].*$/,'').trim() !== g.player.toLowerCase();
+      const rawHint = rawDiffers ? ` <span class="muted" style="font-size:.75rem">(API: "${g.raw}")</span>` : '';
+      return `<tr>
+        <td class="muted">${g.date}</td>
+        <td><strong>${g.player}</strong>${rawHint} ${b(g.scorerOwner)}</td>
+        <td class="muted" style="font-size:.8rem">${g.match}</td>
+        <td><span class="muted">${roundLabel(g.type)}</span></td>
+        <td>${payers} → ${b(g.scorerOwner)} ${baht(g.amount)} each</td>
+      </tr>`;
+    }).join('');
+    html+=`<div class="warn" style="margin-bottom:.75rem;font-size:.8rem">⚠ Verify each row against official match records — API data may contain errors. Raw API scorer name shown in grey where it differs from the matched draft name.</div>`;
+    html+=`<table><thead><tr><th>Date</th><th>Player (raw API name)</th><th>Match</th><th>Round</th><th>Payout</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } else {
+    html+='<p class="muted" style="padding:1rem">No goals by drafted players recorded yet.</p>';
+  }
+  if(unmatched.length) {
+    html+=`<div class="warn" style="margin-top:1rem">⚠ ${unmatched.length} scorer name(s) from API not matched to draft — need alias map update:
+      <table style="margin-top:.5rem"><thead><tr><th>API name</th><th>Match</th><th>Date</th></tr></thead>
+      <tbody>${unmatched.map(u=>`<tr><td class="flag">${u.raw}</td><td>${u.match}</td><td>${u.date}</td></tr>`).join('')}</tbody></table>
+    </div>`;
+  }
+  return html;
+}
+
+function renderTeams(matches) {
+  const stat={};
+  for(const [t] of Object.entries(TEAM_OWNER)) stat[t]={w:0,d:0,l:0,gf:0,ga:0,pts:0,reached:'Group',out:false};
+
+  for(const m of matches){
+    if(!m.score||!m.score.ft) continue;
+    const home=resolveTeam(m.team1), away=resolveTeam(m.team2);
+    const hs=m.score.ft[0], as_=m.score.ft[1];
+    const isGroup=!!m.group;
+    const type=isGroup?'group':roundKeyFromLabel(m.round);
+    const ko=isKO(type);
+    const rl=roundLabel(type);
+
+    const update=(team,gf,ga,won,drew)=>{
+      if(!team||!stat[team]) return;
+      stat[team].gf+=gf; stat[team].ga+=ga;
+      if(!ko){if(won){stat[team].w++;stat[team].pts+=3;}else if(drew){stat[team].d++;stat[team].pts+=1;}else stat[team].l++;}
+      if(ko){stat[team].reached=rl;if(!won&&!drew)stat[team].out=true;}
+    };
+    update(home,hs,as_,hs>as_,hs===as_);
+    update(away,as_,hs,as_>hs,hs===as_);
+  }
+
+  return OWNERS.map(owner=>{
+    const rows=TEAMS[owner].map(t=>{
+      const s=stat[t];
+      const statusColor=s.out?'var(--red)':s.reached!=='Group'?'var(--green)':'var(--muted)';
+      const statusText=s.out?`Eliminated in ${s.reached}`:s.reached!=='Group'?`In ${s.reached}`:'Group stage';
+      return `<tr><td>${t}</td><td>${s.w}–${s.d}–${s.l}</td><td>${s.pts}</td><td>${s.gf}–${s.ga}</td><td style="color:${statusColor};font-size:.8rem">${statusText}</td></tr>`;
+    }).join('');
+    return `<section><h2>${b(owner)}</h2><table><thead><tr><th>Team</th><th>W–D–L</th><th>Pts</th><th>GF–GA</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }).join('');
+}
+
+function renderScorers(goalLedger,bootLeader) {
+  const tally={};
+  for(const [o,ps] of Object.entries(SCORERS)) for(const p of ps) tally[p]={owner:o,goals:0,grp:0,ko:0,gross:0};
+  for(const g of goalLedger){
+    if(!tally[g.player]) continue;
+    tally[g.player].goals++; tally[g.player].gross+=g.amount*3;
+    if(isKO(g.type)) tally[g.player].ko++; else tally[g.player].grp++;
+  }
+  return OWNERS.map(owner=>{
+    const rows=SCORERS[owner].map(p=>{
+      const s=tally[p];
+      return `<tr><td>${p}</td><td><strong>${s.goals}</strong></td><td class="muted">${s.grp}</td><td class="muted">${s.ko}</td><td class="${s.gross?'pos':'muted'}">${s.gross?baht(s.gross):'—'}</td></tr>`;
+    }).sort((a,b)=>{
+      // sort by goals desc (hack: parse from DOM)
+      return 0;
+    }).join('');
+    return `<section><h2>${b(owner)}</h2><table><thead><tr><th>Player</th><th>Goals</th><th>Group</th><th>KO</th><th>Gross earned</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }).join('');
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+function tab(btn,name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pane-'+name).classList.add('active');
+}
+
+function setErr(msg){const el=document.getElementById('err');if(msg){el.style.display='';el.textContent=msg;}else el.style.display='none';}
+
+async function load(){
+  const btn=document.getElementById('rbtn');
+  btn.disabled=true; btn.textContent='↻ Loading…';
+  setErr(null);
+
+  // show elapsed seconds while waiting (API is typically slow ~10s)
+  let elapsed=0;
+  const tick=setInterval(()=>{ elapsed++; document.getElementById('upd').textContent=`Fetching… ${elapsed}s`; },1000);
+  document.getElementById('upd').textContent='Fetching… 0s';
+
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),45000); // 45s hard timeout
+
+  try {
+    const url='https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+    const res=await fetch(url,{signal:controller.signal});
+    clearTimeout(timeout); clearInterval(tick);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    const matches=data.matches||[];
+    const {matchLedger,goalLedger,unmatched,unmatchedTeams}=process(matches);
+    const {gross,pairNet,champion,bootLeader}=compute(matchLedger,goalLedger,matches);
+
+    renderBalances(gross);
+    document.getElementById('pane-settle').innerHTML=renderSettle(pairNet,gross,champion,bootLeader);
+    document.getElementById('pane-matches').innerHTML=renderMatches(matchLedger);
+    document.getElementById('pane-goals').innerHTML=renderGoals(goalLedger,unmatched);
+    document.getElementById('pane-teams').innerHTML=renderTeams(matches);
+    document.getElementById('pane-scorers').innerHTML=renderScorers(goalLedger,bootLeader);
+
+    if(unmatchedTeams.length) setErr(`⚠ Unknown team name(s) from API — add to TEAM_ALIAS: ${unmatchedTeams.join(', ')}`);
+    document.getElementById('upd').textContent=`Updated ${new Date().toLocaleTimeString()}`;
+  } catch(e){
+    clearTimeout(timeout); clearInterval(tick);
+    const msg=e.name==='AbortError'?'Request timed out after 45s — API may be down. Try refreshing.':
+              `Data unavailable — ${e.message}. Try refreshing.`;
+    setErr(msg);
+    document.getElementById('upd').textContent='Failed';
+  } finally {
+    btn.disabled=false; btn.textContent='↻ Refresh';
+  }
+}
+
+load();
+</script>
+</body>
+</html>

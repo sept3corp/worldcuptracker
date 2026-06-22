@@ -1,0 +1,262 @@
+# World Cup 2026 Betting Tracker — Build Spec
+
+## 1. What this is
+
+A web app for a 4-person betting group tracking the FIFA World Cup 2026. Each
+person ("owner") drafted 12 World Cup teams and 8 top-scorer candidates before
+the tournament. The app needs to:
+
+1. Pull live World Cup 2026 results.
+2. Match results against each owner's draft.
+3. Calculate who owes what to whom, using the payout rules below.
+4. Display a settlement ledger + status tables, refreshed live, viewable as a
+   shareable hosted web page (view-only — no login, no backend database
+   required beyond whatever the live data source needs).
+
+The four owners are: **Den**, **Jong**, **Kao**, **Pi**.
+
+---
+
+## 2. Draft data (locked, do not re-derive — this is final)
+
+### 2.1 Team draft (12 teams per owner, 48 total)
+
+| Group | Den | Jong | Kao | Pi |
+|---|---|---|---|---|
+| A | Czechia | South Africa | South Korea | Mexico |
+| B | Qatar | Switzerland | Bosnia and Herzegovina | Canada |
+| C | Morocco | Scotland | Brazil | Haiti |
+| D | United States | Australia | Türkiye | Paraguay |
+| E | Ivory Coast | Curaçao | Germany | Ecuador |
+| F | Tunisia | Netherlands | Japan | Sweden |
+| G | Belgium | New Zealand | Egypt | Iran |
+| H | Spain | Uruguay | Saudi Arabia | Cape Verde |
+| I | Senegal | Norway | Iraq | France |
+| J | Argentina | Austria | Jordan | Algeria |
+| K | Uzbekistan | Colombia | DR Congo | Portugal |
+| L | Panama | England | Croatia | Ghana |
+
+### 2.2 Top scorer draft (8 players per owner, 32 total)
+
+| Den | Jong | Kao | Pi |
+|---|---|---|---|
+| Messi | Mbappe | Kane | V. Junior |
+| Alvarez | Yamal | Oyazabal | P. Torres |
+| Rapinha | Halaland | Wirtz | Ronaldo |
+| Olise | K. Havertz | Rafael Leao | Musiala |
+| Saka | L. Martinez | Diaz | Gakpo |
+| Cherki | Cunha | Nunez | Rasford |
+| Doku | Gyokerez | Salah | Ueda |
+| Martinelli | B. Fermin | **Ousmane Dembele** | — |
+
+**Important note on Ousmane Dembele**: in the original handwritten draft
+sheet, "Dembele" appeared crossed out under both Jong and Pi's columns before
+being finalized under Kao. The user explicitly confirmed Kao is the sole
+owner of Ousmane Dembele. Kao therefore has **8** scorer picks; Pi has **7**.
+Do not add an 8th name to Pi's list — it was confirmed there isn't one.
+
+Total: Den 8, Jong 8, Kao 8, Pi 7 = 31 named players. (This asymmetry is
+correct and confirmed with the user — do not "balance" it to 32.)
+
+---
+
+## 3. Payout rules (locked, fully confirmed with user)
+
+There are **two fundamentally different payout structures** in this bet.
+Getting this distinction right is the most important part of the engine:
+
+- **Match-win payouts**: strictly head-to-head between the two owners whose
+  teams played each other in that specific match. The losing team's owner
+  pays the winning team's owner. The other two owners are not involved at all,
+  regardless of who else is in the bet.
+- **Bonus payouts** (Champion bonus, goal payouts, Golden Boot bonus): paid
+  by **each of the other 3 owners individually** to the relevant owner. E.g.
+  a goal payout of ฿80 means the scoring player's owner receives ฿80 from
+  owner B, ฿80 from owner C, and ฿80 from owner D — ฿240 total — regardless
+  of which team the goal was scored against.
+
+### 3.1 Match-win payouts (head-to-head only)
+
+| Round | Payout to winner's owner | Paid by |
+|---|---|---|
+| Group stage | ฿150 per win | Losing team's owner |
+| Group stage draw | ฿0 | — (no payout either direction) |
+| Round of 32 | ฿150 | Losing team's owner |
+| Round of 16 | ฿200 | Losing team's owner |
+| Quarterfinal | ฿400 | Losing team's owner |
+| Semifinal | ฿600 | Losing team's owner |
+| Third Place Playoff | ฿600 | Losing team's owner |
+| Final | ฿800 | Losing (runner-up) team's owner |
+
+**Knockout matches decided by penalty shootout**: the penalty-shootout
+winner is treated as the match winner for payout purposes. The 90-minute
+(or extra-time) result does not matter once a shootout occurs — only the
+final winner is paid; the loser pays regardless of how close the match was.
+
+### 3.2 Champion bonus (pool-style, on top of the Final match-win payout)
+
+When a team wins the Final, that team's owner receives **both**:
+1. The standard Final match-win payout (฿800) from the runner-up's owner only.
+2. An additional **Champion bonus of ฿1,200 from EACH of the other 3 owners**
+   (฿3,600 total) — this is separate money, not a 3-way split of ฿1,200.
+
+So the champion's owner nets ฿800 + ฿3,600 = ฿4,400 from the Final alone,
+on top of everything accumulated in earlier rounds.
+
+### 3.3 Goal payouts (pool-style)
+
+Every goal scored by one of the 31 drafted players triggers a payout from
+each of the other 3 owners to the scoring player's owner.
+
+| Stage | Payout per goal | Paid by |
+|---|---|---|
+| Group stage | ฿80 | Each of the other 3 owners (฿240 total per goal) |
+| Any knockout match (Round of 32 through Final, **including the Third Place Playoff**) | ฿100 | Each of the other 3 owners (฿300 total per goal) |
+
+Rules:
+- **Own goals never count.** If a drafted player is credited with an own
+  goal by official records, it does NOT trigger a payout. Only goals
+  officially credited to the player as a "scored goal" count.
+- **No cap on goals per match.** A hat-trick in the group stage = 3 × ฿80 =
+  ฿240 owed by each of the other 3 owners (฿720 total to the scorer's owner)
+  for that single match.
+- Goals only count if scored by one of the 31 drafted players specifically.
+  Goals by any other player in the tournament are irrelevant to this bet.
+
+### 3.4 Top scorer / Golden Boot bonus (pool-style, resolved once at tournament end)
+
+Whichever owner's drafted player finishes the entire tournament as the
+**outright** top scorer (Golden Boot winner) receives **฿800 from each of
+the other 3 owners** (฿2,400 total), in addition to all the per-goal payouts
+already earned by that player throughout the tournament.
+
+- This only resolves once, at the end of the tournament.
+- If the Golden Boot is shared/tied by official FIFA rules between multiple
+  players, and more than one of them is one of the 31 drafted players
+  owned by different owners — ask the user how to split this rather than
+  assuming. This edge case was not covered in the confirmed rules.
+- If the actual Golden Boot winner is NOT one of the 31 drafted players at
+  all, no one receives this bonus.
+
+---
+
+## 4. Settlement engine logic (what the app must compute)
+
+For any point in the tournament, the app should be able to produce:
+
+1. **A per-match ledger**: each completed match, which two owners' teams (if
+   any from the draft) were involved, the result, and the resulting
+   head-to-head payout (who owes whom, how much, which round).
+2. **A per-goal ledger**: each goal scored by a drafted player, which match/
+   round it was in, and the resulting 3-way payout (owner of scorer receives
+   from the other 3).
+3. **A running net balance per owner**: total received minus total owed,
+   summed across all match-win payouts, goal payouts, and any bonuses
+   resolved so far. This requires resolving the *net* between each pair of
+   owners (since match-win debts run in both directions over the
+   tournament) — show both the gross ledger and the simplified net-per-pair
+   summary (e.g. "Jong owes Den ฿350 net" rather than listing every
+   individual transaction).
+4. **Live/pending bonus tracking**: Champion bonus and Golden Boot bonus
+   should show as "pending" / unresolved with a leaderboard of current
+   standing (e.g. current top scorer among the 31 drafted players, current
+   surviving teams per owner) until the tournament actually ends.
+5. **Team status table**: per owner, list of their 12 teams with current
+   group standing / knockout round reached / eliminated status.
+6. **Scorer status table**: per owner, list of their players with current
+   goal tally and cumulative earnings from that player alone.
+
+---
+
+## 5. Data source
+
+**Primary candidate**: `https://worldcup26.ir` — a free, open-source,
+no-API-key REST API built specifically for WC 2026.
+- `GET /get/games` — all 104 matches, scores, scorers (fields seen in
+  public docs: `home_score`, `away_score`, `home_scorers`, `away_scorers`,
+  `group`, `matchday`, `finished`, `type` — note `type` distinguishes group
+  vs knockout matches, useful for the goal-payout rate split).
+- `GET /get/groups` — group standings.
+- `GET /get/teams` — team list/IDs.
+
+**Known risks — handle defensively**:
+- This is an unofficial, donation-funded hobby project with no SLA. It may
+  go down, change its response format, or get rate-limited without notice.
+- The site's `robots.txt` blocks server-side/automated fetching from at
+  least some tooling (confirmed: Anthropic's own `web_fetch` tool was
+  blocked by this). It is *unknown* whether direct browser-side `fetch()`
+  calls (CORS-permitting) from a hosted static page will work — this needs
+  to be tested live once hosted, not assumed.
+- The `home_scorers`/`away_scorers` fields' reliability for mapping to the
+  31 drafted player names is unverified — names may not exactly match the
+  shorthand used in the draft (e.g. "Alvarez" vs a full official name like
+  "Julián Álvarez"). Build a name-matching/aliasing layer rather than exact
+  string matching, and flag unmatched scorer entries for manual review
+  rather than silently dropping them.
+- User has explicitly said: keep this simple, just attempt the live API,
+  no manual-paste fallback UI needed. If the live fetch fails, show a clear
+  "data unavailable, try refresh" error state — do not fabricate or cache
+  stale data silently.
+
+**Fallback / verification approach if `worldcup26.ir` doesn't pan out**:
+search for alternatives (`openfootball/worldcup.json` on GitHub is a
+free, no-key, daily-updated JSON dataset as a backup, though not live/real-
+time — updated roughly once a day by the maintainer). Confirm with the user
+before switching data sources, since switching changes what "live" means.
+
+---
+
+## 6. Build requirements (confirmed with user)
+
+- **Hosting model**: simple shareable web page, view-only. User updates/
+  shares the link with friends; no per-user login or accounts.
+- **Refresh behavior**: auto-fetch live data when the page loads, PLUS a
+  manual refresh button for re-fetching on demand.
+- **Team status detail level**: show group position, W-D-L record, and
+  points per team — no need for next-match date/opponent or full mini group
+  tables (user explicitly chose the simpler option).
+- **Scorer data refresh**: ideally live via the same API's match-scorer
+  fields. If that proves unreliable, the documented fallback approach
+  discussed with the user was a daily web-search-based snapshot of official
+  FIFA top-scorer data — but per the user's later "keep it simple" decision,
+  start with attempting live data only; don't build the manual/snapshot
+  fallback UI unless the live approach demonstrably fails.
+- **No manual data-paste fallback UI** — explicitly declined by user.
+- **Visual design**: this is a functional tool/dashboard for checking daily,
+  not a branded showcase. Keep it clean, readable, and fast — prioritize
+  clarity of the ledger and tables over visual flourish.
+- **Timestamp**: show "last updated" time so users know data freshness.
+
+---
+
+## 7. Open questions / edge cases not yet resolved
+
+Flag these to the user if/when they come up rather than assuming:
+
+1. **Golden Boot tie/shared award** across multiple drafted players owned
+   by different owners — no rule confirmed for splitting this.
+2. **Exact name matching** between the API's scorer fields and the 31
+   drafted player names (shorthand vs. full official names) — will need
+   a manual alias map, built and refined empirically once real data is
+   flowing.
+3. **CORS / live-fetch viability** of `worldcup26.ir` from a browser
+   context — unverified, test as the first build step before investing in
+   the rest of the UI.
+4. **Best 8 third-place teams advancing to Round of 32**: with the new
+   48-team format, some drafted teams may advance not as group winners/
+   runners-up but as one of the best 8 third-place teams across all 12
+   groups. The status table logic must account for this — a 3rd-place
+   finish in the group doesn't automatically mean elimination.
+
+---
+
+## 8. Context already validated
+
+- All 12 group assignments in the team draft were cross-checked against the
+  official FIFA World Cup 2026 draw and confirmed to match exactly — no
+  corrections needed there.
+- The tournament is already in progress as of this spec's writing: group
+  stage ran June 11–27, 2026; knockout stage runs June 28–July 19, 2026;
+  Third Place Playoff is July 18 in Miami; Final is July 19 at MetLife
+  Stadium, New Jersey. Any build/testing should account for backfilling
+  results already played, not just tracking forward.

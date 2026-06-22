@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start *)",
+      "WebSearch",
+      "Bash(curl -s \"https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/en/rounds.json\")",
+      "Bash(curl -s \"https://api.github.com/repos/openfootball/worldcup.json/contents/2026\")",
+      "Bash(python -c \"import sys,json; [print\\(x['name']\\) for x in json.load\\(sys.stdin\\)]\")"
+    ]
+  }
+}
