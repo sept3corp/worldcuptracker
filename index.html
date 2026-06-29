@@ -747,11 +747,23 @@ function knockoutRoundHtml(matches, round, label) {
 
 function renderR32(matches) {
   const lookup = buildMatchLookup(matches || []);
+
+  // Count alive teams per owner (in R32 bracket, not yet knocked out)
+  const r32Teams = [...R32_TOP, ...R32_BOT].flatMap(d => [d.t1, d.t2]);
+  const knockoutLosers = new Set();
+  (matches || []).filter(m => m.round !== 'group' && m.finished).forEach(m => {
+    const loser = m.homeWinner ? m.awayTeam : m.awayWinner ? m.homeTeam : null;
+    if (loser) knockoutLosers.add(loser);
+  });
+  const alive = {};
+  OWNERS.forEach(o => { alive[o] = 0; });
+  r32Teams.forEach(t => { const o = TEAM_OWNER[t]; if (o && !knockoutLosers.has(t)) alive[o]++; });
+
   const legend = `<div class="r32-legend">
-    <span><span class="owner-dot oc-Den"></span>Den</span>
-    <span><span class="owner-dot oc-Jong"></span>Jong</span>
-    <span><span class="owner-dot oc-Kao"></span>Kao</span>
-    <span><span class="owner-dot oc-Pi"></span>Pi</span>
+    <span><span class="owner-dot oc-Den"></span>Den <span style="color:#8b949e;font-size:11px">${alive.Den} left</span></span>
+    <span><span class="owner-dot oc-Jong"></span>Jong <span style="color:#8b949e;font-size:11px">${alive.Jong} left</span></span>
+    <span><span class="owner-dot oc-Kao"></span>Kao <span style="color:#8b949e;font-size:11px">${alive.Kao} left</span></span>
+    <span><span class="owner-dot oc-Pi"></span>Pi <span style="color:#8b949e;font-size:11px">${alive.Pi} left</span></span>
   </div>`;
   const toggle = `<div class="half-toggle">
     <button id="btn-top" class="ht-active" onclick="showHalf('top')">Top Half (M1–M8)</button>
