@@ -119,8 +119,23 @@ const SCORER_DRAFT = {
 const TEAM_OWNER = {};
 Object.entries(TEAM_DRAFT).forEach(([o, ts]) => ts.forEach(t => { TEAM_OWNER[t] = o; }));
 
+// Mid-tournament transfer window (opens Round of 32)
+// out: goals no longer counted from R32 onwards
+// in:  goals counted from R32 onwards only; NOT eligible for Golden Boot
+const TRANSFERS = {
+  Den:  { out: ['Rapinha', 'Doku'],       in: ['Undav', 'Brobbey'] },
+  Kao:  { out: ['Rafael Leao', 'Nunez'],  in: ['Balogun', 'Doue'] },
+  Pi:   { out: ['F. Torres'],             in: ['Bellingham'] },
+  Jong: { out: [],                         in: [] },
+};
+
 const SCORER_OWNER = {};
 Object.entries(SCORER_DRAFT).forEach(([o, ps]) => ps.forEach(p => { SCORER_OWNER[p] = o; }));
+// Register transfer-in players with their new owner
+Object.entries(TRANSFERS).forEach(([o, t]) => t.in.forEach(p => { SCORER_OWNER[p] = o; }));
+
+const DROPPED_PLAYERS     = new Set(Object.values(TRANSFERS).flatMap(t => t.out));
+const TRANSFER_IN_PLAYERS = new Set(Object.values(TRANSFERS).flatMap(t => t.in));
 
 // ═══════════════════════════════════════════════════════
 // PAYOUT RULES  (locked)
@@ -203,6 +218,12 @@ const SCORER_ALIASES = {
   'marcus rashford': 'Rasford', 'rashford': 'Rasford',
   'ayase ueda': 'Ueda', 'ueda': 'Ueda',
   'raul jimenez': 'R. Jimenez', 'raúl jiménez': 'R. Jimenez', 'r. jimenez': 'R. Jimenez', 'r. jiménez': 'R. Jimenez', 'jimenez': 'R. Jimenez',
+  // Transfer-in players
+  'deniz undav': 'Undav', 'd. undav': 'Undav', 'undav': 'Undav',
+  'brian brobbey': 'Brobbey', 'b. brobbey': 'Brobbey', 'brobbey': 'Brobbey',
+  'folarin balogun': 'Balogun', 'f. balogun': 'Balogun', 'balogun': 'Balogun',
+  'désiré doué': 'Doue', 'desire doue': 'Doue', 'd. doué': 'Doue', 'doué': 'Doue', 'doue': 'Doue', 'd. doue': 'Doue',
+  'jude bellingham': 'Bellingham', 'bellingham': 'Bellingham', 'j. bellingham': 'Bellingham',
 };
 
 function normalizeTeam(raw) {
@@ -308,6 +329,8 @@ function calculate(matches, groupStandings) {
 
   Object.values(TEAM_DRAFT).flat().forEach(t  => { teamEarnings[t] = 0; });
   Object.values(SCORER_DRAFT).flat().forEach(p => { scorerGoals[p]  = { goals: 0, earnings: 0 }; });
+  // Also initialise transfer-in players
+  TRANSFER_IN_PLAYERS.forEach(p => { scorerGoals[p] = { goals: 0, earnings: 0 }; });
 
   const roundOrder = ['group','round_of_32','round_of_16','quarterfinal','semifinal','third_place','final'];
   let champTeam = null;
@@ -353,13 +376,19 @@ function calculate(matches, groupStandings) {
     }
 
     // ── Goal payouts ──
-    const goalRate = (round !== 'group') ? GOAL_PAYOUT_KNOCKOUT : GOAL_PAYOUT_GROUP;
+    const goalRate  = (round !== 'group') ? GOAL_PAYOUT_KNOCKOUT : GOAL_PAYOUT_GROUP;
+    const isKnockout = round !== 'group';
 
     goals.forEach(({ playerName }) => {
       const canonical   = normalizeScorer(playerName);
       if (!canonical) return;
       const scorerOwner = SCORER_OWNER[canonical];
       if (!scorerOwner) return;
+
+      // Dropped players: group stage goals already counted; knockout goals ignored
+      if (DROPPED_PLAYERS.has(canonical) && isKnockout) return;
+      // Transfer-in players: only knockout goals count; group stage goals ignored
+      if (TRANSFER_IN_PLAYERS.has(canonical) && !isKnockout) return;
 
       scorerGoals[canonical].goals    += 1;
       scorerGoals[canonical].earnings += goalRate * 3;
@@ -377,7 +406,7 @@ function calculate(matches, groupStandings) {
   transactions.forEach(t => { balances[t.to].received += t.amount; balances[t.from].paid += t.amount; });
 
   const topScorers = Object.entries(scorerGoals)
-    .filter(([, v]) => v.goals > 0)
+    .filter(([name, v]) => v.goals > 0 && !TRANSFER_IN_PLAYERS.has(name))
     .sort((a, b) => b[1].goals - a[1].goals);
 
   return { transactions, teamEarnings, scorerGoals, balances, groupStandings, teamRound, topScorers, champTeam };
@@ -483,17 +512,32 @@ function renderTeams(c) {
 function renderScorers(c) {
   let h = '';
   OWNERS.forEach(owner => {
+    const dropped = new Set(TRANSFERS[owner]?.out || []);
+    const added   = TRANSFERS[owner]?.in || [];
+    const allPlayers = [...SCORER_DRAFT[owner], ...added];
+
     h += `<div class="owner-section">
       <div class="owner-header">${owner}</div>
       <table><thead><tr><th>Player</th><th>Goals</th><th>Earned</th></tr></thead><tbody>`;
-    SCORER_DRAFT[owner].forEach(player => {
-      const d = c.scorerGoals[player] || { goals: 0, earnings: 0 };
-      h += `<tr>
-        <td>${player}</td>
+
+    allPlayers.forEach(player => {
+      const d     = c.scorerGoals[player] || { goals: 0, earnings: 0 };
+      const isOut = dropped.has(player);
+      const isIn  = TRANSFER_IN_PLAYERS.has(player);
+
+      const namePart = isOut
+        ? `<span style="text-decoration:line-through;color:#6e7681">${player}</span> <span style="font-size:11px;color:#f85149;font-weight:600">OUT</span>`
+        : isIn
+          ? `${player} <span style="font-size:11px;color:#e3b341;font-weight:600">R32+</span>`
+          : player;
+
+      h += `<tr${isOut ? ' style="opacity:0.55"' : ''}>
+        <td>${namePart}</td>
         <td>${d.goals > 0 ? `<span style="color:#f0f6fc;font-weight:600">${d.goals}</span>` : '<span class="dim">0</span>'}</td>
         <td>${d.earnings > 0 ? `<span class="earn-pos">${fmt(d.earnings)}</span>` : '<span class="dim">0</span>'}</td>
       </tr>`;
     });
+
     h += `</tbody></table></div>`;
   });
   document.getElementById('tab-scorers').innerHTML = h;
