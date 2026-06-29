@@ -638,6 +638,7 @@ async function loadData() {
     renderTeams(computed);
     renderScorers(computed);
     renderLedger(computed);
+    renderR32(matches);
 
     document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
 
@@ -661,147 +662,118 @@ function switchTab(tab) {
 }
 
 function chip(owner) {
-  return `<span class="owner-chip oc-${owner}">${owner[0]}</span>`;
+  return owner ? `<span class="owner-chip oc-${owner}">${owner[0]}</span>` : `<span style="display:inline-block;width:24px"></span>`;
 }
 
-function renderR32() {
-  document.getElementById('tab-r32').innerHTML = `
-    <div class="r32-legend">
-      <span><span class="owner-dot oc-Den"></span>Den</span>
-      <span><span class="owner-dot oc-Jong"></span>Jong</span>
-      <span><span class="owner-dot oc-Kao"></span>Kao</span>
-      <span><span class="owner-dot oc-Pi"></span>Pi</span>
-    </div>
-    <div class="half-toggle">
-      <button id="btn-top" class="ht-active" onclick="showHalf('top')">Top Half (M1–M8)</button>
-      <button id="btn-bot" onclick="showHalf('bottom')">Bottom Half (M9–M16)</button>
-    </div>
+// Fixed R32 draw
+const R32_TOP = [
+  { date:'Jun 28 · Inglewood, CA',      t1:'South Africa',          t2:'Canada' },
+  { date:'Jun 29 · Houston, TX',         t1:'Brazil',                t2:'Japan' },
+  { date:'Jun 29 · Foxborough, MA',      t1:'Germany',               t2:'Paraguay' },
+  { date:'Jun 29 · Monterrey, MX',       t1:'Netherlands',           t2:'Morocco' },
+  { date:'Jun 30 · Arlington, TX',       t1:'Ivory Coast',           t2:'Norway' },
+  { date:'Jun 30 · East Rutherford, NJ', t1:'France',                t2:'Sweden' },
+  { date:'Jun 30 · Mexico City',         t1:'Mexico',                t2:'Ecuador' },
+  { date:'Jul 1 · Atlanta, GA',          t1:'England',               t2:'DR Congo' },
+];
+const R32_BOT = [
+  { date:'Jul 1 · Seattle, WA',          t1:'Belgium',               t2:'Senegal' },
+  { date:'Jul 1 · Santa Clara, CA',      t1:'United States',         t2:'Bosnia and Herzegovina' },
+  { date:'Jul 2 · Inglewood, CA',        t1:'Spain',                 t2:'Austria' },
+  { date:'Jul 2 · Vancouver, Canada',    t1:'Switzerland',           t2:'Algeria' },
+  { date:'Jul 2 · Toronto, Canada',      t1:'Portugal',              t2:'Croatia' },
+  { date:'Jul 3 · Arlington, TX',        t1:'Australia',             t2:'Egypt' },
+  { date:'Jul 3 · Miami Gardens, FL',    t1:'Argentina',             t2:'Cape Verde' },
+  { date:'Jul 3 · Kansas City, MO',      t1:'Colombia',              t2:'Ghana' },
+];
 
-    <div id="r32-top" class="bracket-section active">
-      <div class="r32-round-label">Round of 32 — Matches 1–8</div>
+function buildMatchLookup(matches) {
+  const map = {};
+  matches.forEach(m => {
+    if (!m.homeTeam || !m.awayTeam) return;
+    const key = [m.homeTeam, m.awayTeam].sort().join('|');
+    map[key] = m;
+  });
+  return map;
+}
 
-      <div class="r32-match">
-        <div class="r32-meta">Jun 28 · Inglewood, CA</div>
-        <div class="r32-team">${chip('Jong')} South Africa</div>
-        <div class="r32-team">${chip('Pi')} Canada</div>
-      </div>
+function r32TeamRow(name, matchResult) {
+  const owner   = TEAM_OWNER[name];
+  const isLoser = matchResult?.finished && (
+    (matchResult.homeWinner && matchResult.awayTeam === name) ||
+    (matchResult.awayWinner && matchResult.homeTeam === name)
+  );
+  const isWinner = matchResult?.finished && (
+    (matchResult.homeWinner && matchResult.homeTeam === name) ||
+    (matchResult.awayWinner && matchResult.awayTeam === name)
+  );
+  const nameStyle = isLoser ? 'text-decoration:line-through;color:#6e7681' : isWinner ? 'color:#f0f6fc;font-weight:600' : '';
+  const badge = isWinner ? ' <span style="font-size:10px;color:#3fb950;font-weight:700;margin-left:4px">ADV ›</span>' :
+                isLoser  ? ' <span style="font-size:10px;color:#f85149;margin-left:4px">OUT</span>' : '';
+  return `<div class="r32-team" style="${isLoser ? 'opacity:0.45' : ''}">
+    ${chip(owner)}<span style="${nameStyle}">${name}</span>${badge}
+  </div>`;
+}
 
-      <div class="r32-match">
-        <div class="r32-meta">Jun 29 · Houston, TX</div>
-        <div class="r32-team">${chip('Kao')} Brazil</div>
-        <div class="r32-team">${chip('Kao')} Japan</div>
-        <div class="r32-mirror">⚠ Same owner — no payout either way</div>
-      </div>
+function r32MatchCard(def, lookup) {
+  const key   = [def.t1, def.t2].sort().join('|');
+  const match = lookup[key] || null;
+  const o1 = TEAM_OWNER[def.t1], o2 = TEAM_OWNER[def.t2];
+  const sameOwner = o1 && o2 && o1 === o2;
+  return `<div class="r32-match">
+    <div class="r32-meta">${def.date}</div>
+    ${r32TeamRow(def.t1, match)}
+    ${r32TeamRow(def.t2, match)}
+    ${sameOwner ? '<div class="r32-mirror">⚠ Same owner — no payout either way</div>' : ''}
+  </div>`;
+}
 
-      <div class="r32-match">
-        <div class="r32-meta">Jun 29 · Foxborough, MA</div>
-        <div class="r32-team">${chip('Kao')} Germany</div>
-        <div class="r32-team">${chip('Pi')} Paraguay</div>
-      </div>
+function knockoutRoundHtml(matches, round, label) {
+  const ms = matches.filter(m => m.round === round);
+  if (!ms.length) return '';
+  let h = `<div class="r32-round-label">${label}</div>`;
+  ms.forEach(m => {
+    const o1 = TEAM_OWNER[m.homeTeam], o2 = TEAM_OWNER[m.awayTeam];
+    const fake = { finished: m.finished, homeWinner: m.homeWinner, awayWinner: m.awayWinner, homeTeam: m.homeTeam, awayTeam: m.awayTeam };
+    const sameOwner = o1 && o2 && o1 === o2;
+    h += `<div class="r32-match">
+      ${r32TeamRow(m.homeTeam, fake)}
+      ${r32TeamRow(m.awayTeam, fake)}
+      ${sameOwner ? '<div class="r32-mirror">⚠ Same owner — no payout either way</div>' : ''}
+    </div>`;
+  });
+  return h;
+}
 
-      <div class="r32-match">
-        <div class="r32-meta">Jun 29 · Monterrey, MX</div>
-        <div class="r32-team">${chip('Jong')} Netherlands</div>
-        <div class="r32-team">${chip('Den')} Morocco</div>
-      </div>
+function renderR32(matches) {
+  const lookup = buildMatchLookup(matches || []);
+  const legend = `<div class="r32-legend">
+    <span><span class="owner-dot oc-Den"></span>Den</span>
+    <span><span class="owner-dot oc-Jong"></span>Jong</span>
+    <span><span class="owner-dot oc-Kao"></span>Kao</span>
+    <span><span class="owner-dot oc-Pi"></span>Pi</span>
+  </div>`;
+  const toggle = `<div class="half-toggle">
+    <button id="btn-top" class="ht-active" onclick="showHalf('top')">Top Half (M1–M8)</button>
+    <button id="btn-bot" onclick="showHalf('bottom')">Bottom Half (M9–M16)</button>
+  </div>`;
+  const topSection = `<div id="r32-top" class="bracket-section active">
+    <div class="r32-round-label">Round of 32 — Matches 1–8</div>
+    ${R32_TOP.map(d => r32MatchCard(d, lookup)).join('')}
+  </div>`;
+  const botSection = `<div id="r32-bot" class="bracket-section">
+    <div class="r32-round-label">Round of 32 — Matches 9–16</div>
+    ${R32_BOT.map(d => r32MatchCard(d, lookup)).join('')}
+  </div>`;
+  const laterRounds =
+    knockoutRoundHtml(matches || [], 'round_of_16',   'Round of 16') +
+    knockoutRoundHtml(matches || [], 'quarterfinal',  'Quarterfinals') +
+    knockoutRoundHtml(matches || [], 'semifinal',     'Semifinals') +
+    knockoutRoundHtml(matches || [], 'third_place',   '3rd Place Playoff') +
+    knockoutRoundHtml(matches || [], 'final',         'Final');
 
-      <div class="r32-match">
-        <div class="r32-meta">Jun 30 · Arlington, TX</div>
-        <div class="r32-team">${chip('Den')} Ivory Coast</div>
-        <div class="r32-team">${chip('Jong')} Norway</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jun 30 · East Rutherford, NJ</div>
-        <div class="r32-team">${chip('Pi')} France</div>
-        <div class="r32-team">${chip('Pi')} Sweden</div>
-        <div class="r32-mirror">⚠ Same owner — no payout either way</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jun 30 · Mexico City</div>
-        <div class="r32-team">${chip('Pi')} Mexico</div>
-        <div class="r32-team">${chip('Pi')} Ecuador</div>
-        <div class="r32-mirror">⚠ Same owner — no payout either way</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 1 · Atlanta, GA</div>
-        <div class="r32-team">${chip('Jong')} England</div>
-        <div class="r32-team">${chip('Kao')} DR Congo</div>
-      </div>
-
-      <div class="r32-round-label">→ Round of 16 (top half winners)</div>
-      <div class="r32-match">
-        <div class="r32-team r32-future">Winner M1 vs Winner M4</div>
-        <div class="r32-team r32-future">Winner M2 vs Winner M3</div>
-        <div class="r32-team r32-future">Winner M5 vs Winner M8</div>
-        <div class="r32-team r32-future">Winner M6 vs Winner M7</div>
-      </div>
-    </div>
-
-    <div id="r32-bot" class="bracket-section">
-      <div class="r32-round-label">Round of 32 — Matches 9–16</div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 1 · Seattle, WA</div>
-        <div class="r32-team">${chip('Den')} Belgium</div>
-        <div class="r32-team">${chip('Den')} Senegal</div>
-        <div class="r32-mirror">⚠ Same owner — no payout either way</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 1 · Santa Clara, CA</div>
-        <div class="r32-team">${chip('Den')} United States</div>
-        <div class="r32-team">${chip('Kao')} Bosnia &amp; Herzegovina</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 2 · Inglewood, CA</div>
-        <div class="r32-team">${chip('Den')} Spain</div>
-        <div class="r32-team">${chip('Jong')} Austria</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 2 · Vancouver, Canada</div>
-        <div class="r32-team">${chip('Jong')} Switzerland</div>
-        <div class="r32-team">${chip('Pi')} Algeria</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 2 · Toronto, Canada</div>
-        <div class="r32-team">${chip('Kao')} Portugal</div>
-        <div class="r32-team">${chip('Kao')} Croatia</div>
-        <div class="r32-mirror">⚠ Same owner — no payout either way</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 3 · Arlington, TX</div>
-        <div class="r32-team">${chip('Jong')} Australia</div>
-        <div class="r32-team">${chip('Kao')} Egypt</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 3 · Miami Gardens, FL</div>
-        <div class="r32-team">${chip('Den')} Argentina</div>
-        <div class="r32-team">${chip('Pi')} Cape Verde</div>
-      </div>
-
-      <div class="r32-match">
-        <div class="r32-meta">Jul 3 · Kansas City, MO</div>
-        <div class="r32-team">${chip('Jong')} Colombia</div>
-        <div class="r32-team">${chip('Pi')} Ghana</div>
-      </div>
-
-      <div class="r32-round-label">→ Round of 16 (bottom half winners)</div>
-      <div class="r32-match">
-        <div class="r32-team r32-future">Winner M9 vs Winner M10</div>
-        <div class="r32-team r32-future">Winner M11 vs Winner M12</div>
-        <div class="r32-team r32-future">Winner M13 vs Winner M14</div>
-        <div class="r32-team r32-future">Winner M15 vs Winner M16</div>
-      </div>
-    </div>
-  `;
+  document.getElementById('tab-r32').innerHTML = legend + toggle + topSection + botSection +
+    (laterRounds ? `<div style="margin-top:8px">${laterRounds}</div>` : '');
 }
 
 function showHalf(half) {
@@ -811,7 +783,7 @@ function showHalf(half) {
   document.getElementById('btn-bot').classList.toggle('ht-active', half === 'bottom');
 }
 
-renderR32();
+renderR32([]);
 loadData();
 </script>
 </body>
