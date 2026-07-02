@@ -152,6 +152,21 @@ const SCORER_DRAFT = {
 const TEAM_OWNER = {};
 Object.entries(TEAM_DRAFT).forEach(([o, ts]) => ts.forEach(t => { TEAM_OWNER[t] = o; }));
 
+// National team for each drafted/transferred scorer (for elimination detection)
+const SCORER_TEAM = {
+  'Messi':'Argentina','Alvarez':'Argentina','Rapinha':'Brazil','Olise':'France',
+  'Saka':'England','Cherki':'France','Doku':'Belgium','Martinelli':'Brazil',
+  'Undav':'Germany','Brobbey':'Netherlands',
+  'Mbappe':'France','Yamal':'Spain','Halaland':'Norway','K. Havertz':'Germany',
+  'L. Martinez':'Argentina','Cunha':'Brazil','Gyokerez':'Sweden','B. Fermin':'Spain',
+  'Kane':'England','Oyazabal':'Spain','Wirtz':'Germany','Rafael Leao':'Portugal',
+  'Diaz':'Colombia','Nunez':'Uruguay','Salah':'Egypt','Ousmane Dembele':'France',
+  'Balogun':'United States','Doue':'France',
+  'V. Junior':'Brazil','F. Torres':'Spain','Ronaldo':'Portugal','Musiala':'Germany',
+  'Gakpo':'Netherlands','Rasford':'England','Ueda':'Japan','R. Jimenez':'Mexico',
+  'Bellingham':'England',
+};
+
 // Mid-tournament transfer window (opens Round of 32)
 // out: goals no longer counted from R32 onwards
 // in:  goals counted from R32 onwards only; NOT eligible for Golden Boot
@@ -442,7 +457,16 @@ function calculate(matches, groupStandings) {
     .filter(([name, v]) => v.goals > 0 && !TRANSFER_IN_PLAYERS.has(name))
     .sort((a, b) => b[1].goals - a[1].goals);
 
-  return { transactions, teamEarnings, scorerGoals, balances, groupStandings, teamRound, topScorers, champTeam };
+  // Build eliminated teams (group stage non-qualifiers + knockout losers)
+  const eliminatedTeams = new Set();
+  Object.entries(groupStandings).forEach(([team, gs]) => { if (!gs.advanced) eliminatedTeams.add(team); });
+  for (const match of matches) {
+    if (!match.finished || match.round === 'group') continue;
+    const loser = match.homeWinner ? match.awayTeam : match.awayWinner ? match.homeTeam : null;
+    if (loser) eliminatedTeams.add(loser);
+  }
+
+  return { transactions, teamEarnings, scorerGoals, balances, groupStandings, teamRound, topScorers, champTeam, eliminatedTeams };
 }
 
 // ═══════════════════════════════════════════════════════
@@ -558,13 +582,16 @@ function renderScorers(c) {
       const isOut = dropped.has(player);
       const isIn  = TRANSFER_IN_PLAYERS.has(player);
 
+      const teamElim = !isOut && SCORER_TEAM[player] && c.eliminatedTeams?.has(SCORER_TEAM[player]);
       const namePart = isOut
         ? `<span style="text-decoration:line-through;color:#6e7681">${player}</span> <span style="font-size:11px;color:#f85149;font-weight:600">OUT</span>`
         : isIn
-          ? `${player} <span style="font-size:11px;color:#e3b341;font-weight:600">R32+</span>`
-          : player;
+          ? `${player}${teamElim ? ' <span style="font-size:11px;color:#f85149;font-weight:600">ELIM</span>' : ' <span style="font-size:11px;color:#e3b341;font-weight:600">R32+</span>'}`
+          : teamElim
+            ? `<span style="text-decoration:line-through;color:#6e7681">${player}</span> <span style="font-size:11px;color:#f85149;font-weight:600">ELIM</span>`
+            : player;
 
-      h += `<tr${isOut ? ' style="opacity:0.55"' : ''}>
+      h += `<tr${isOut || teamElim ? ' style="opacity:0.55"' : ''}>
         <td>${namePart}</td>
         <td>${d.goals > 0 ? `<span style="color:#f0f6fc;font-weight:600">${d.goals}</span>` : '<span class="dim">0</span>'}</td>
         <td>${d.earnings > 0 ? `<span class="earn-pos">${fmt(d.earnings)}</span>` : '<span class="dim">0</span>'}</td>
