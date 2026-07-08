@@ -63,7 +63,6 @@
     .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; white-space: nowrap; }
     .badge-active  { background: #0d4429; color: #3fb950; border: 1px solid #1b5c30; }
     .badge-elim    { background: #3d1a1a; color: #f85149; border: 1px solid #6b2020; }
-    .badge-pending { background: #0d2846; color: #58a6ff; border: 1px solid #1b4070; }
     .badge-goal    { background: #1c2a0d; color: #7ee787; border: 1px solid #2a4a10; }
     .badge-match   { background: #0d2846; color: #58a6ff; border: 1px solid #1b4070; }
     .badge-bonus   { background: #2a1a46; color: #bc8cff; border: 1px solid #4a2a80; }
@@ -490,9 +489,6 @@ function teamStatusBadge(team, groupStandings, teamRound, eliminatedTeams, champ
 
   if (gs) {
     if (gs.advanced) return `<span class="badge badge-active">Advanced</span>`;
-    if (gs.pos === 1) return `<span class="badge badge-pending">1st in grp</span>`;
-    if (gs.pos === 2) return `<span class="badge badge-pending">2nd in grp</span>`;
-    if (gs.pos === 3) return `<span class="badge badge-pending">3rd (pending)</span>`;
     return `<span class="badge badge-elim">Eliminated</span>`;
   }
   return `<span class="dim">&mdash;</span>`;
