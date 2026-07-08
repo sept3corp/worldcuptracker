@@ -539,6 +539,10 @@ function renderOverview(c) {
     });
   }
   document.getElementById('tab-overview').innerHTML = h;
+
+  c.topScorers.slice(0, 8).forEach(([name]) => {
+    if (!c.scorerPhotos[name]) upgradeScorerAvatar(name);
+  });
 }
 
 function renderTeams(c) {
@@ -698,27 +702,70 @@ function chip(owner) {
   return owner ? `<span class="owner-chip oc-${owner}">${owner[0]}</span>` : `<span style="display:inline-block;width:24px"></span>`;
 }
 
+function scorerAvatarId(name) {
+  return 'avatar_' + name.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
 function scorerInitialsAvatar(name) {
   const initials = (name.match(/\S+/g) || []).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   const hue = hash % 360;
-  return `<span class="scorer-avatar" style="background:hsl(${hue},55%,32%)">${initials}</span>`;
-}
-
-function scorerAvatarFallback(img) {
-  img.replaceWith(scorerInitialsAvatarEl(img.dataset.name));
-}
-
-function scorerInitialsAvatarEl(name) {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = scorerInitialsAvatar(name);
-  return tmp.firstElementChild;
+  const safeName = name.replace(/"/g, '&quot;');
+  return `<span id="${scorerAvatarId(name)}" class="scorer-avatar" style="background:hsl(${hue},55%,32%)" data-name="${safeName}">${initials}</span>`;
 }
 
 function scorerAvatar(name, photoUrl) {
   if (!photoUrl) return scorerInitialsAvatar(name);
-  return `<img class="scorer-avatar-photo" src="${photoUrl}" alt="" data-name="${name.replace(/"/g, '&quot;')}" onerror="scorerAvatarFallback(this)">`;
+  const safeName = name.replace(/"/g, '&quot;');
+  return `<img id="${scorerAvatarId(name)}" class="scorer-avatar-photo" src="${photoUrl}" alt="" data-name="${safeName}" onerror="scorerAvatarFallback(this)">`;
+}
+
+function scorerAvatarFallback(img) {
+  const name = img.dataset.name;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = scorerInitialsAvatar(name);
+  img.replaceWith(tmp.firstElementChild);
+  upgradeScorerAvatar(name);
+}
+
+// ── Secondary photo source: Wikipedia (used when ESPN has no headshot) ──
+const WIKI_PHOTO_CACHE = {};
+
+async function fetchWikipediaPhoto(name) {
+  if (WIKI_PHOTO_CACHE[name] !== undefined) return WIKI_PHOTO_CACHE[name];
+  try {
+    const team  = SCORER_TEAM[name] || '';
+    const query = encodeURIComponent(`${name} footballer ${team}`.trim());
+    const searchRes  = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${query}&format=json&origin=*&srlimit=1`);
+    const searchData = await searchRes.json();
+    const title = searchData?.query?.search?.[0]?.title;
+    if (!title) { WIKI_PHOTO_CACHE[name] = null; return null; }
+
+    const summaryRes  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+    const summaryData = await summaryRes.json();
+    const photo = summaryData?.thumbnail?.source || null;
+    WIKI_PHOTO_CACHE[name] = photo;
+    return photo;
+  } catch {
+    WIKI_PHOTO_CACHE[name] = null;
+    return null;
+  }
+}
+
+async function upgradeScorerAvatar(name) {
+  const photo = await fetchWikipediaPhoto(name);
+  if (!photo) return;
+  const el = document.getElementById(scorerAvatarId(name));
+  if (!el || el.tagName === 'IMG') return;
+  const img = document.createElement('img');
+  img.id = scorerAvatarId(name);
+  img.className = 'scorer-avatar-photo';
+  img.alt = '';
+  img.dataset.name = name;
+  img.onerror = () => scorerAvatarFallback(img);
+  img.src = photo;
+  el.replaceWith(img);
 }
 
 // Fixed R32 draw
