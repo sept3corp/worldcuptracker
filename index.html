@@ -88,11 +88,6 @@
     /* ── R32 bracket ── */
     .r32-legend { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; font-size:12px; }
     .r32-legend > span { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px; background:#161b22; border:1px solid #30363d; }
-    .half-toggle { display:flex; gap:8px; margin-bottom:18px; }
-    .half-toggle button { flex:1; padding:9px; border-radius:8px; font-size:13px; font-weight:600; }
-    .half-toggle button.ht-active { background:#1c2128; border-color:#58a6ff; color:#58a6ff; }
-    .bracket-section { display:none; }
-    .bracket-section.active { display:block; }
     .r32-round-label { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#8b949e; margin:18px 0 8px; padding-left:2px; }
     .r32-match { background:#161b22; border:1px solid #30363d; border-radius:8px; margin-bottom:8px; overflow:hidden; }
     .r32-team { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:13px; border-bottom:1px solid #30363d; }
@@ -714,16 +709,6 @@ const R32_BOT = [
   { date:'Jul 3 · Kansas City, MO',      t1:'Colombia',              t2:'Ghana' },
 ];
 
-function buildMatchLookup(matches) {
-  const map = {};
-  matches.forEach(m => {
-    if (!m.homeTeam || !m.awayTeam) return;
-    const key = [m.homeTeam, m.awayTeam].sort().join('|');
-    map[key] = m;
-  });
-  return map;
-}
-
 function r32TeamRow(name, matchResult) {
   const owner   = TEAM_OWNER[name];
   const isLoser = matchResult?.finished && (
@@ -739,19 +724,6 @@ function r32TeamRow(name, matchResult) {
                 isLoser  ? ' <span style="font-size:10px;color:#f85149;margin-left:4px">OUT</span>' : '';
   return `<div class="r32-team" style="${isLoser ? 'opacity:0.45' : ''}">
     ${chip(owner)}<span style="${nameStyle}">${name}</span>${badge}
-  </div>`;
-}
-
-function r32MatchCard(def, lookup) {
-  const key   = [def.t1, def.t2].sort().join('|');
-  const match = lookup[key] || null;
-  const o1 = TEAM_OWNER[def.t1], o2 = TEAM_OWNER[def.t2];
-  const sameOwner = o1 && o2 && o1 === o2;
-  return `<div class="r32-match">
-    <div class="r32-meta">${def.date}</div>
-    ${r32TeamRow(def.t1, match)}
-    ${r32TeamRow(def.t2, match)}
-    ${sameOwner ? '<div class="r32-mirror">⚠ Same owner — no payout either way</div>' : ''}
   </div>`;
 }
 
@@ -773,8 +745,6 @@ function knockoutRoundHtml(matches, round, label) {
 }
 
 function renderR32(matches) {
-  const lookup = buildMatchLookup(matches || []);
-
   // Count alive teams per owner (in R32 bracket, not yet knocked out)
   const r32Teams = [...R32_TOP, ...R32_BOT].flatMap(d => [d.t1, d.t2]);
   const knockoutLosers = new Set();
@@ -792,34 +762,10 @@ function renderR32(matches) {
     <span><span class="owner-dot oc-Kao"></span>Kao <span style="color:#8b949e;font-size:11px">${alive.Kao} left</span></span>
     <span><span class="owner-dot oc-Pi"></span>Pi <span style="color:#8b949e;font-size:11px">${alive.Pi} left</span></span>
   </div>`;
-  const toggle = `<div class="half-toggle">
-    <button id="btn-top" class="ht-active" onclick="showHalf('top')">Top Half (M1–M8)</button>
-    <button id="btn-bot" onclick="showHalf('bottom')">Bottom Half (M9–M16)</button>
-  </div>`;
-  const topSection = `<div id="r32-top" class="bracket-section active">
-    <div class="r32-round-label">Round of 32 — Matches 1–8</div>
-    ${R32_TOP.map(d => r32MatchCard(d, lookup)).join('')}
-  </div>`;
-  const botSection = `<div id="r32-bot" class="bracket-section">
-    <div class="r32-round-label">Round of 32 — Matches 9–16</div>
-    ${R32_BOT.map(d => r32MatchCard(d, lookup)).join('')}
-  </div>`;
-  const laterRounds =
-    knockoutRoundHtml(matches || [], 'round_of_16',   'Round of 16') +
-    knockoutRoundHtml(matches || [], 'quarterfinal',  'Quarterfinals') +
-    knockoutRoundHtml(matches || [], 'semifinal',     'Semifinals') +
-    knockoutRoundHtml(matches || [], 'third_place',   '3rd Place Playoff') +
-    knockoutRoundHtml(matches || [], 'final',         'Final');
+  const quarterfinals = knockoutRoundHtml(matches || [], 'quarterfinal', 'Quarterfinals');
 
-  document.getElementById('tab-r32').innerHTML = legend + toggle + topSection + botSection +
-    (laterRounds ? `<div style="margin-top:8px">${laterRounds}</div>` : '');
-}
-
-function showHalf(half) {
-  document.getElementById('r32-top').classList.toggle('active', half === 'top');
-  document.getElementById('r32-bot').classList.toggle('active', half === 'bottom');
-  document.getElementById('btn-top').classList.toggle('ht-active', half === 'top');
-  document.getElementById('btn-bot').classList.toggle('ht-active', half === 'bottom');
+  document.getElementById('tab-r32').innerHTML = legend +
+    (quarterfinals || '<div class="r32-future">Quarterfinal matchups not yet set.</div>');
 }
 
 renderR32([]);
