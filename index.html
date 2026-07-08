@@ -84,6 +84,7 @@
     .owner-card.oc-Pi   { border-left:3px solid var(--c-Pi); }
     .owner-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
     .scorer-avatar { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:9px; font-weight:700; color:#fff; margin-right:6px; vertical-align:middle; flex-shrink:0; }
+    .scorer-avatar-photo { display:inline-block; width:20px; height:20px; border-radius:50%; object-fit:cover; background:#30363d; margin-right:6px; vertical-align:middle; flex-shrink:0; }
 
     /* ── R32 bracket ── */
     .r32-legend { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; font-size:12px; }
@@ -314,6 +315,8 @@ function parseESPNMatches(events) {
       .filter(d => d.scoringPlay === true && d.ownGoal !== true)
       .map(d => ({
         playerName: d.athletesInvolved?.[0]?.displayName || '',
+        athleteId:  d.athletesInvolved?.[0]?.id || null,
+        headshot:   d.athletesInvolved?.[0]?.headshot?.href || null,
         teamId:     d.team?.id,
         homeTeamId: home?.team?.id,
       }));
@@ -368,6 +371,7 @@ function calculate(matches, groupStandings) {
   const transactions  = [];
   const teamEarnings  = {};
   const scorerGoals   = {};
+  const scorerPhotos  = {};
   const teamRound     = {};
 
   Object.values(TEAM_DRAFT).flat().forEach(t  => { teamEarnings[t] = 0; });
@@ -422,11 +426,16 @@ function calculate(matches, groupStandings) {
     const goalRate  = (round !== 'group') ? GOAL_PAYOUT_KNOCKOUT : GOAL_PAYOUT_GROUP;
     const isKnockout = round !== 'group';
 
-    goals.forEach(({ playerName }) => {
+    goals.forEach(({ playerName, athleteId, headshot }) => {
       const canonical   = normalizeScorer(playerName);
       if (!canonical) return;
       const scorerOwner = SCORER_OWNER[canonical];
       if (!scorerOwner) return;
+
+      if (!scorerPhotos[canonical]) {
+        scorerPhotos[canonical] = headshot ||
+          (athleteId ? `https://a.espncdn.com/i/headshots/soccer/players/full/${athleteId}.png` : null);
+      }
 
       // Dropped players: group stage goals already counted; knockout goals ignored
       if (DROPPED_PLAYERS.has(canonical) && isKnockout) return;
@@ -461,7 +470,7 @@ function calculate(matches, groupStandings) {
     if (loser) eliminatedTeams.add(loser);
   }
 
-  return { transactions, teamEarnings, scorerGoals, balances, groupStandings, teamRound, topScorers, champTeam, eliminatedTeams };
+  return { transactions, teamEarnings, scorerGoals, scorerPhotos, balances, groupStandings, teamRound, topScorers, champTeam, eliminatedTeams };
 }
 
 // ═══════════════════════════════════════════════════════
@@ -523,7 +532,7 @@ function renderOverview(c) {
     c.topScorers.slice(0, 8).forEach(([name, data], i) => {
       const owner = SCORER_OWNER[name];
       h += `<div class="pair-row" style="${i > 0 ? 'opacity:.75' : ''}">
-        <span>${scorerAvatar(name)}${i === 0 ? '<strong>' : ''}${name}${i === 0 ? '</strong>' : ''} <span class="dim">(${owner})</span>
+        <span>${scorerAvatar(name, c.scorerPhotos[name])}${i === 0 ? '<strong>' : ''}${name}${i === 0 ? '</strong>' : ''} <span class="dim">(${owner})</span>
         &nbsp;&middot;&nbsp; ${data.goals} goal${data.goals !== 1 ? 's' : ''}</span>
         <span class="${i === 0 ? 'amt pos' : ''}">${fmt(data.earnings)}</span>
       </div>`;
@@ -689,12 +698,27 @@ function chip(owner) {
   return owner ? `<span class="owner-chip oc-${owner}">${owner[0]}</span>` : `<span style="display:inline-block;width:24px"></span>`;
 }
 
-function scorerAvatar(name) {
+function scorerInitialsAvatar(name) {
   const initials = (name.match(/\S+/g) || []).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   const hue = hash % 360;
   return `<span class="scorer-avatar" style="background:hsl(${hue},55%,32%)">${initials}</span>`;
+}
+
+function scorerAvatarFallback(img) {
+  img.replaceWith(scorerInitialsAvatarEl(img.dataset.name));
+}
+
+function scorerInitialsAvatarEl(name) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = scorerInitialsAvatar(name);
+  return tmp.firstElementChild;
+}
+
+function scorerAvatar(name, photoUrl) {
+  if (!photoUrl) return scorerInitialsAvatar(name);
+  return `<img class="scorer-avatar-photo" src="${photoUrl}" alt="" data-name="${name.replace(/"/g, '&quot;')}" onerror="scorerAvatarFallback(this)">`;
 }
 
 // Fixed R32 draw
