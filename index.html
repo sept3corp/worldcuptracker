@@ -477,11 +477,16 @@ const ROUND_LABELS = {
   quarterfinal: 'Quarterfinal', semifinal: 'Semifinal', third_place: '3rd Place', final: 'Final',
 };
 
-function teamStatusBadge(team, groupStandings, teamRound) {
+function teamStatusBadge(team, groupStandings, teamRound, eliminatedTeams, champTeam) {
   const round = teamRound[team];
   const gs    = groupStandings[team];
 
-  if (round && round !== 'group') return `<span class="badge badge-active">${ROUND_LABELS[round] || round}</span>`;
+  if (round && round !== 'group') {
+    const label = ROUND_LABELS[round] || round;
+    if (team === champTeam) return `<span class="badge badge-active">Champion</span>`;
+    if (eliminatedTeams?.has(team)) return `<span class="badge badge-elim">Eliminated (${label})</span>`;
+    return `<span class="badge badge-active">${label}</span>`;
+  }
 
   if (gs) {
     if (gs.advanced) return `<span class="badge badge-active">Advanced</span>`;
@@ -553,7 +558,7 @@ function renderTeams(c) {
         <td>${gs?.d     ?? '&mdash;'}</td>
         <td>${gs?.l     ?? '&mdash;'}</td>
         <td>${gs?.pts   ?? '&mdash;'}</td>
-        <td>${teamStatusBadge(team, c.groupStandings, c.teamRound)}</td>
+        <td>${teamStatusBadge(team, c.groupStandings, c.teamRound, c.eliminatedTeams, c.champTeam)}</td>
         <td>${earn > 0 ? `<span class="earn-pos">${fmt(earn)}</span>` : '<span class="dim">0</span>'}</td>
       </tr>`;
     });
