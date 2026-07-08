@@ -84,6 +84,7 @@
     .owner-card.oc-Kao  { border-left:3px solid var(--c-Kao); }
     .owner-card.oc-Pi   { border-left:3px solid var(--c-Pi); }
     .owner-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+    .scorer-avatar { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:9px; font-weight:700; color:#fff; margin-right:6px; vertical-align:middle; flex-shrink:0; }
 
     /* ── R32 bracket ── */
     .r32-legend { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; font-size:12px; }
@@ -521,7 +522,7 @@ function renderOverview(c) {
     c.topScorers.slice(0, 8).forEach(([name, data], i) => {
       const owner = SCORER_OWNER[name];
       h += `<div class="pair-row" style="${i > 0 ? 'opacity:.75' : ''}">
-        <span>${i === 0 ? '<strong>' : ''}${name}${i === 0 ? '</strong>' : ''} <span class="dim">(${owner})</span>
+        <span>${scorerAvatar(name)}${i === 0 ? '<strong>' : ''}${name}${i === 0 ? '</strong>' : ''} <span class="dim">(${owner})</span>
         &nbsp;&middot;&nbsp; ${data.goals} goal${data.goals !== 1 ? 's' : ''}</span>
         <span class="${i === 0 ? 'amt pos' : ''}">${fmt(data.earnings)}</span>
       </div>`;
@@ -685,6 +686,14 @@ function switchTab(tab) {
 
 function chip(owner) {
   return owner ? `<span class="owner-chip oc-${owner}">${owner[0]}</span>` : `<span style="display:inline-block;width:24px"></span>`;
+}
+
+function scorerAvatar(name) {
+  const initials = (name.match(/\S+/g) || []).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return `<span class="scorer-avatar" style="background:hsl(${hue},55%,32%)">${initials}</span>`;
 }
 
 // Fixed R32 draw
