@@ -312,7 +312,7 @@ function parseESPNMatches(events) {
     const round = SLUG_TO_ROUND[event.season?.slug] || null;
 
     const goals = (comp?.details || [])
-      .filter(d => d.scoringPlay === true && d.ownGoal !== true)
+      .filter(d => d.scoringPlay === true && d.ownGoal !== true && d.shootout !== true)
       .map(d => ({
         playerName: d.athletesInvolved?.[0]?.displayName || '',
         athleteId:  d.athletesInvolved?.[0]?.id || null,
